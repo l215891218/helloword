@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context" xmlns:tx="http://www.springframework.org/schema/tx"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx.xsd">
+
+    <!-- 加载配置属性文件 -->
+    <context:property-placeholder ignore-unresolvable="true" location="classpath:gesoft.properties" />
+
+    <!-- spring 可以自动去扫描 com.demo 下面的包或子包下面的Java文件，
+ 如果扫描到有Spring的相关注解(@Component @Controller@Service等)的类，则把这些类注册为Spring的bean,
+  可以发现这种扫描的粒度有点太大-->
+    <!--有一个use-default-filters属性，该属性默认为true,这就意味着会扫描指定包下的全部的标有@Component的类，
+    并注册成bean.也就是@Component的子注解@Service,@Reposity等-->
+    <!--如果配置了<context:component-scan>那么<context:annotation-config/>标签就可以不用再xml中配置了，因为前者包含了后者-->
+    <!--另外<context:component-scan>还提供了两个子标签 <context:include-filter> 和 <context:exclude-filter>-->
+    <!--Use-dafault-filters=”false”的情况下：<context:exclude-filter>表示指定的不扫描，<context:include-filter>表示指定的扫描-->
+    <!--    <context:component-scan base-package="com.demo"/>-->
+
+    <!-- 使用Annotation自动注册Bean，解决事物失效问题：在主容器中不扫描@Controller注解，在SpringMvc中只扫描@Controller注解。  -->
+    <!-- 只需要扫描 com.hello 下的 @Controller，@Service, @Componet, 并注册成bean  use-default-filters="false"  use-default-filters="false"
+     加载 除去Controller 之外的注解   Controller  在 SpringMVC中加载
+     -->
+
+    <context:component-scan base-package="com">
+        <!--<context:exclude-filter type="annotation" expression="org.springframework.stereotype.Controller"/>-->
+        <!--<context:include-filter type="annotation" expression="org.springframework.stereotype.Controller"/>-->
+        <context:exclude-filter type="annotation" expression="org.springframework.stereotype.Controller"/>
+        <!--<context:include-filter type="regex" expression="com.hello.controller.*"/>-->
+        <!--<context:include-filter type="regex" expression="com.hello.service.*"/>-->
+        <!--<context:include-filter type="annotation" expression="org.springframework.stereotype.Component" />-->
+    </context:component-scan>
+
+
+
+    <!-- 数据源配置, 使用 BoneCP 数据库连接池 -->
+    <bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource" init-method="init" destroy-method="close">
+        <!-- 数据源驱动类可不写，Druid默认会自动根据URL识别DriverClass -->
+        <property name="driverClassName" value="${jdbc.driver}" />
+
+        <!-- 基本属性 url、user、password -->
+        <property name="url" value="${jdbc.url}" />
+        <property name="username" value="${jdbc.username}" />
+        <property name="password" value="${jdbc.password}" />
+
+        <!-- 配置初始化大小、最小、最大 -->
+        <property name="initialSize" value="${jdbc.pool.init}" />
+        <property name="minIdle" value="${jdbc.pool.minIdle}" />
+        <property name="maxActive" value="${jdbc.pool.maxActive}" />
+
+        <!-- 配置获取连接等待超时的时间 -->
+        <property name="maxWait" value="60000" />
+
+        <!-- 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒 -->
+        <property name="timeBetweenEvictionRunsMillis" value="60000" />
+
+        <!-- 配置一个连接在池中最小生存的时间，单位是毫秒 -->
+        <property name="minEvictableIdleTimeMillis" value="300000" />
+
+        <property name="validationQuery" value="${jdbc.testSql}" />
+        <property name="testWhileIdle" value="true" />
+        <property name="testOnBorrow" value="false" />
+        <property name="testOnReturn" value="false" />
+
+        <!-- 打开PSCache，并且指定每个连接上PSCache的大小（Oracle使用）
+        <property name="poolPreparedStatements" value="true" />
+        <property name="maxPoolPreparedStatementPerConnectionSize" value="20" /> -->
+
+        <!-- 配置监控统计拦截的filters -->
+        <property name="filters" value="stat" />
+    </bean>
+
+
+    <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+        <property name="dataSource" ref="dataSource" />
+        <property name="mapperLocations"  value="classpath:com/**/mapper/*.xml" />
+        <property name="typeAliasesPackage" value="com.**.entity" />
+        <property name="typeAliasesSuperType" value="com.common.BaseEntity" />
+        <property name="configLocation" value="classpath:mybatis-config.xml"/>
+    </bean>
+    <!--<bean id="demoMapper" class="org.mybatis.spring.mapper.MapperFactoryBean">-->
+        <!--<property name="sqlSessionFactory" ref="sqlSessionFactory" />-->
+        <!--<property name="mapperInterface" value="com.hello.mapper.HelloMapper" />-->
+    <!--</bean>-->
+
+    <!-- 扫描basePackage -->
+    <bean id="mapperScannerConfigurer" class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+        <!-- 指定要自动扫描接口的基础包，实现接口 -->
+        <property name="basePackage" value="com.**.mapper"/>
+    </bean>
+
+
+    <!-- 定义事务 -->
+    <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <property name="dataSource" ref="dataSource" />
+    </bean>
+
+    <!-- 配置 Annotation 驱动，扫描@Transactional注解的类定义事务  -->
+    <tx:annotation-driven transaction-manager="transactionManager" proxy-target-class="true"/>
+
+    <bean id="transactionTemplate"
+          class="org.springframework.transaction.support.TransactionTemplate">
+        <property name="transactionManager" ref="transactionManager"/>
+    </bean>
+
+
+
+    <!--&lt;!&ndash; 自定义域realm &ndash;&gt;-->
+    <!--<bean id="custom_Realm" class="com.common.shiro.CustomRealm"></bean>-->
+
+    <!--&lt;!&ndash; 安全管理器  ref对象&ndash;&gt;-->
+    <!--<bean id="securityManager" class="org.apache.shiro.web.mgt.DefaultWebSecurityManager">-->
+        <!--&lt;!&ndash;<property name="realm" ref="custom_Realm"/>&ndash;&gt;-->
+    <!--</bean>-->
+
+    <!--&lt;!&ndash;          &ndash;&gt;-->
+    <!--<bean id="lifecycleBeanPostProcessor" class="org.apache.shiro.spring.LifecycleBeanPostProcessor"/>-->
+    <!--&lt;!&ndash;        &ndash;&gt;-->
+    <!--<bean class="org.springframework.aop.framework.autoproxy.DefaultAdvisorAutoProxyCreator" depends-on="lifecycleBeanPostProcessor"/>-->
+    <!--&lt;!&ndash;         &ndash;&gt;-->
+    <!--<bean class="org.apache.shiro.spring.security.interceptor.AuthorizationAttributeSourceAdvisor">-->
+
+        <!--<property name="securityManager" ref="securityManager"/>-->
+    <!--</bean>-->
+    <!--&lt;!&ndash; 配置shiro的过滤器工厂类，id- shiroFilter要和我们在web.xml中配置的过滤器一致 &ndash;&gt;-->
+    <!--<bean id="shiroFilter" class="org.apache.shiro.spring.web.ShiroFilterFactoryBean">-->
+        <!--<property name="securityManager" ref="securityManager"/>-->
+        <!--&lt;!&ndash; 登录页面 &ndash;&gt;-->
+        <!--<property name="loginUrl" value="/login"/>-->
+        <!--&lt;!&ndash; 登录成功后的页面 &ndash;&gt;-->
+        <!--<property name="successUrl" value="/index"/>-->
+        <!--&lt;!&ndash; 非法访问跳转的页面 &ndash;&gt;-->
+        <!--<property name="unauthorizedUrl" value="/403"/>-->
+        <!--&lt;!&ndash; 权限配置 &ndash;&gt;-->
+        <!--<property name="filterChainDefinitions">-->
+            <!--<value>-->
+                <!--&lt;!&ndash; 无需认证即可访问的静态资源，还可以添加其他 url &ndash;&gt;-->
+                <!--/static/** = anon-->
+                <!--&lt;!&ndash; 除了上述忽略的资源，其他所有资源都需要认证后才能访问 &ndash;&gt;-->
+                <!--/** = authc-->
+            <!--</value>-->
+        <!--</property>-->
+    <!--</bean>-->
+
+
+
+
+
+</beans>
